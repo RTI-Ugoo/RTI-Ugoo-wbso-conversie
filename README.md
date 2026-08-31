@@ -30,11 +30,25 @@ Deployen gaat via GitHub Actions (`.github/workflows/deploy.yml`): elke push naa
 `main` deployt automatisch naar de Azure Function App. Handmatig deployen vanuit VS
 Code is niet meer nodig.
 
-Eenmalige setup: voeg het Azure publish-profile van de Function App toe als GitHub
-secret `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` (Settings → Secrets and variables →
-Actions). Het publish-profile haal je op in de Azure Portal: Function App →
-Overview → "Get publish profile" (download als XML, plak de volledige inhoud als
-secret-waarde).
+De Function App draait op het **Flex Consumption**-plan. Dat plan ondersteunt geen
+publish-profile/Kudu-deploy meer; de workflow logt daarom in via een Azure AD
+service principal met OIDC (`Azure/login`), zonder wachtwoord in GitHub.
+
+Eenmalige setup (Azure Portal, Entra ID):
+1. **App registration** aanmaken (Entra ID → App registrations → New registration).
+   Noteer de **Application (client) ID** en **Directory (tenant) ID**.
+2. Onder die app registration: **Certificates & secrets → Federated credentials →
+   Add credential**, scenario "GitHub Actions deploying Azure resources",
+   Organization `RTI-Ugoo`, Repository `RTI-Ugoo-wbso-conversie`, Entity type
+   "Branch", Branch name `main`.
+3. Rol toekennen: Function App → **Access control (IAM) → Add role assignment** →
+   rol "Website Contributor" → toewijzen aan de zojuist aangemaakte app
+   registration (service principal).
+4. **Subscription ID** noteren (Subscriptions-pagina in Azure Portal).
+5. Drie GitHub secrets toevoegen (Settings → Secrets and variables → Actions):
+   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+
+`AZURE_FUNCTIONAPP_PUBLISH_PROFILE` is niet meer nodig en mag verwijderd worden.
 
 ## Regressie-discipline
 
