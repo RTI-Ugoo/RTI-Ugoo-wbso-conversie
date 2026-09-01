@@ -26,9 +26,14 @@ document eerst voordat je wijzigingen aanbrengt.
 
 ## Deployen
 
-Deployen gaat via GitHub Actions (`.github/workflows/deploy.yml`): elke push naar
-`main` deployt automatisch naar de Azure Function App. Handmatig deployen vanuit VS
-Code is niet meer nodig.
+**Status: geparkeerd — voorlopig handmatig deployen vanuit VS Code, zoals
+voorheen** (rechtermuisklik op de projectmap → "Deploy to Function App").
+De automatische GitHub Actions-deploy is voorbereid maar staat uit tot de
+eenmalige Entra ID-setup hieronder met de IT-partner is afgerond (daarvoor is
+een tenant-niveau app registration nodig, waar de consultant zelf geen
+toegang toe heeft). Zodra dat rond is: zet in
+`.github/workflows/deploy.yml` de trigger terug naar `push: branches: [main]`
+en elke push naar `main` deployt weer automatisch.
 
 De Function App draait op het **Flex Consumption**-plan. Dat plan ondersteunt geen
 publish-profile/Kudu-deploy meer; de workflow logt daarom in via een Azure AD

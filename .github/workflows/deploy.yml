@@ -1,8 +1,10 @@
 name: Deploy naar Azure Function App
 
+# GEPARKEERD: automatische trigger op push staat uit tot de Entra ID/OIDC-setup
+# met de IT-partner rond is (zie README.md, sectie "Deployen"). Tot die tijd
+# handmatig deployen vanuit VS Code, zoals voorheen. Handmatig testen van deze
+# workflow kan wel via "Run workflow" in de Actions-tab (workflow_dispatch).
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 permissions:
