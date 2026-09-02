@@ -524,15 +524,12 @@ def parse_docx(pad: str):
             sleutel, waarde = mh.group(1).lower(), schoon(mh.group(2))
             if "bedrijfsnaam" in sleutel or "company name" in sleutel:
                 project["bedrijf"] = waarde
-            elif "application period" in sleutel:
-                # Sommige documenten hebben geen apart "Start date"-label en
-                # gebruiken alleen "Application period" (bv. "January until
-                # and including June 2026"). Vult zowel periode als, bij
-                # gebrek aan een echte startdatum, de startdatum-fallback.
-                project["periode"] = waarde
-                datum_match = RE_DATUM.search(waarde)
-                project["startdatum"] = datum_match.group(1) if datum_match else waarde
             elif "periode" in sleutel or "period" in sleutel:
+                # "Application period" is een periode-aanduiding, GEEN
+                # startdatum-label. Als een document geen apart
+                # "Startdatum"/"Start date" heeft, blijft startdatum
+                # terecht leeg (-> bestaande fout "Startdatum niet
+                # gevonden"); hier niet stiekem vullen met periodetekst.
                 project["periode"] = waarde
             elif "uren" in sleutel or "hours" in sleutel:
                 project["uren"] = waarde
