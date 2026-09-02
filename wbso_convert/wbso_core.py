@@ -354,6 +354,24 @@ def classificeer_techniek(par) -> str:
     if re.search(r"\(max\.?\s*[\d.]+\s*tekens\)", laag):
         return "skip"
 
+    # Korte vette subkop die het techniek-type benoemt met een licht afwijkende
+    # zinsvolgorde (bv. "Beoogde technische oplossingsrichtingen" i.p.v.
+    # "Technische oplossingsrichtingen", "Programmeertechnische probleemstellingen"
+    # i.p.v. "Technische knelpunten"). De bestaande tk/to/tr-detectie hieronder
+    # verwacht dat de kop MET het kernwoord begint; deze varianten hebben er een
+    # bijvoeglijk woord voor staan, waardoor ze anders als los, ongenummerd
+    # component gezien worden (en de koptekst zelf als inhoud in TK belandt).
+    # Hier wordt alleen de modus gezet; de koptekst zelf is geen inhoud.
+    if is_bold(par) and len(t) < 90 and ":" not in t:
+        if re.search(r"^(\S+\s+){0,2}oplossingsricht", laag) or re.search(r"^(\S+\s+){0,2}technical\s+solutions?\b", laag):
+            return "to_kop"
+        if re.search(r"^(\S+\s+){0,2}probleemstelling", laag) or re.search(r"^(\S+\s+){0,2}technisch(e)?\s+knelpunt", laag):
+            return "tk_kop"
+        if (re.search(r"^(\S+\s+){0,2}technisch(e)?\s+risico", laag)
+                or re.search(r"^(\S+\s+){0,2}technische?\s+nieuwheid", laag)
+                or re.search(r"^(\S+\s+){0,2}technical\s+(risk|novelty)", laag)):
+            return "tr_kop"
+
     # Ongenummerde component-kop: een korte VETTE naam die zelf geen TK/TO/TR-marker
     # is (bv. "Asynchrone endpoints", "Conditionele logging & tracing"). Dient als
     # component die automatisch doorgenummerd wordt. Alleen als kort en zonder
@@ -517,7 +535,18 @@ def parse_docx(pad: str):
             and len(tekst) < 90
             and not re.match(r"^(TK|TO|TR|TB|TS)\d*\s*[:.]", tekst, re.IGNORECASE)
         )
-        if is_heading_stijl or is_vette_kop or is_maxlimiet_kop:
+        # Statuskop zonder opmaak: sommige sjablonen typen "Status en voortgang
+        # ..." als gewone, niet-vette alinea (stijl "No Spacing" i.p.v. Heading
+        # of bold). Zonder deze uitzondering wordt zo'n regel helemaal niet als
+        # kop gezien en blijft de update-tekst ongedetecteerd. Kort en zonder
+        # zininterne punt, om te voorkomen dat gewone lopende tekst die met
+        # "Status" begint hier per ongeluk in trapt.
+        is_statuskop = bool(
+            re.match(r"^status\b", tekst, re.IGNORECASE)
+            and len(tekst) < 100
+            and not re.search(r"[.!?]\s+\S", tekst)
+        )
+        if is_heading_stijl or is_vette_kop or is_maxlimiet_kop or is_statuskop:
             kt = kop_type(tekst)
             if kt:
                 sectie = kt
@@ -552,6 +581,12 @@ def parse_docx(pad: str):
         elif sectie == "techniek":
             soort = classificeer_techniek(el)
             if soort == "skip":
+                continue
+            if soort in ("to_kop", "tk_kop", "tr_kop"):
+                # Subkop die alleen het techniek-type benoemt (geen marker-
+                # inhoud erachter): alleen de modus zetten, koptekst zelf niet
+                # als inhoud opslaan.
+                techniek_modus = {"to_kop": "to", "tk_kop": "tk", "tr_kop": "tr"}[soort]
                 continue
             if soort == "component":
                 # Expliciet nummer (TK3, TB3, of cijfer-kop "3.") -> gebruik dat
