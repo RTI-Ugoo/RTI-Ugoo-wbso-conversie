@@ -103,7 +103,7 @@ def normaliseer_projectcode(code: str) -> str:
     # dubbele streepjes samenvouwen
     code = re.sub(r"-{2,}", "-", code)
     return code
-RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Aantal ontwikkeluren|WBSO-uren|WBSO uren|Aantal S&O-uren|S&O-uren|Number of R&D hours|Number of hours|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Start project|Startdatum project)\s*:\s*(.*)$", re.IGNORECASE)
+RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Aantal ontwikkeluren|WBSO-uren|WBSO uren|Aantal S&O-uren|S&O-uren|Number of R&D hours|Amount of R&D Hours|Number of hours|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Start project|Startdatum project)\s*:\s*(.*)$", re.IGNORECASE)
 RE_INTERNE_NOOT = re.compile(r"^<<.*>>$")
 
 # Tussenkopjes/labels die geen inhoudelijke tekst zijn en niet in een veld horen.
@@ -133,6 +133,7 @@ KOP_MAP = [
     ("projectfasering", "fasering"),
     ("planning werkzaamheden", "fasering"),
     ("project planning", "fasering"),
+    ("timeline", "fasering"),
     # projectomschrijving
     ("projectomschrijving", "omschrijving"),
     ("project description", "omschrijving"),
@@ -761,10 +762,16 @@ def bouw_veldwaarden(p: dict, formuliertype: str = "programmatuur"):
     }
 
     # Fasering (max 10 regels). Faseringsdatums worden NIET gesignaleerd
-    # (te veel ruis); de consultant controleert de fasering sowieso.
+    # (te veel ruis); de consultant controleert de fasering sowieso. Een
+    # volledig lege fasering (geen enkele regel herkend) is wel een FOUT,
+    # want dan ontbreekt de hele sectie in het formulier.
     for i, (activiteit, datum) in enumerate(p["fasering"][:10], start=1):
         velden[f"Ontwikkeling{i}"] = activiteit
         velden[f"DatumGereed{i}"] = datum
+
+    if not p["fasering"]:
+        fouten.append("Projectfasering: geen enkele regel gevonden. Controleer of de "
+                      "faseringstabel in het Word-document staat.")
 
     # Kosten/uitgaven
     if "forfait" in p["kosten_uitgaven"].lower():
