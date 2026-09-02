@@ -103,7 +103,7 @@ def normaliseer_projectcode(code: str) -> str:
     # dubbele streepjes samenvouwen
     code = re.sub(r"-{2,}", "-", code)
     return code
-RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Aantal ontwikkeluren|WBSO-uren|WBSO uren|Aantal S&O-uren|S&O-uren|Number of R&D hours|Amount of R&D Hours|Number of hours|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Start project|Startdatum project)\s*:\s*(.*)$", re.IGNORECASE)
+RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Aantal ontwikkeluren|WBSO-uren|WBSO uren|Aantal S&O-uren|S&O-uren|Number of R&D hours|Amount of R&D Hours|Number of hours|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Starting date|Start project|Startdatum project|Application period)\s*:\s*(.*)$", re.IGNORECASE)
 RE_INTERNE_NOOT = re.compile(r"^<<.*>>$")
 
 # Tussenkopjes/labels die geen inhoudelijke tekst zijn en niet in een veld horen.
@@ -239,6 +239,13 @@ def kop_type(tekst: str):
     # per aanvraag en per consultant, dus die worden hier bewust niet vastgelegd.
     if re.match(r"^status\b", tekst, re.IGNORECASE):
         return "update"
+
+    # Kop die "planning", "fasering" of "timeline" bevat (ergens in de kop,
+    # niet alleen aan het begin) -> faseringssectie. Vangt varianten als
+    # "Development planning" die niet overeenkomen met de specifiekere
+    # sleutels hieronder ("planning werkzaamheden", "project planning").
+    if re.search(r"planning|fasering|timeline", laag_los):
+        return "fasering"
 
     beste = None
     beste_len = 0
@@ -387,25 +394,30 @@ def classificeer_techniek(par) -> str:
             return "component"
 
     # Technisch risico / novelty / technical risk (TR1, TN1, enz.)
+    # De kale varianten (zonder dubbele punt) matchen op de ORIGINELE tekst
+    # (t, niet laag) en eisen hoofdletters (TR/TN), zodat een gewone zin die
+    # toevallig met "Tr "/"Tk " begint niet per ongeluk als marker geldt. De
+    # kolon-varianten blijven hoofdletterongevoelig, want de dubbele punt
+    # maakt die al veilig.
     if (re.match(r"^(het\s+|als\s+)?technische?\s+risico", laag)
             or re.match(r"^technical\s+risk", laag)
             or re.match(r"^technical\s+novelty", laag)
             or re.match(r"^(tr|tn)\s*\d*\s*[:.]", laag)
-            or re.match(r"^(tr|tn)\s*\d*\b", laag)):
+            or re.match(r"^(?i:als\s+)?(TR|TN)\s*\d*\b", t)):
         return "tr"
 
     # Technische oplossingsrichting / technical solution (TO1, TS1, enz.)
     if (re.match(r"^(als\s+)?(de\s+)?technische?\s+oplossingsricht", laag)
             or re.match(r"^(als\s+)?technical\s+solution", laag)
             or re.match(r"^(als\s+)?(to|ts)\s*\d*\s*[:.]", laag)
-            or re.match(r"^(als\s+)?(to|ts)\s*\d*\b", laag)):
+            or re.match(r"^(?i:als\s+)?(TO|TS)\s*\d*\b", t)):
         return "to"
 
     # Technisch knelpunt / technical bottleneck (TK1, TB1, enz.)
     if (re.match(r"^(het\s+)?technisch(e)?\s+knelpunt", laag)
             or re.match(r"^(het\s+)?technical\s+bottleneck", laag)
             or re.match(r"^(als\s+)?(tk|tb)\s*\d*\s*[:.]", laag)
-            or re.match(r"^(als\s+)?(tk|tb)\s*\d*\b", laag)
+            or re.match(r"^(?i:als\s+)?(TK|TB)\s*\d*\b", t)
             or laag.startswith(("knelpunt", "bottleneck"))):
         return "tk"
     if "knelpunt" in laag[:60] or "bottleneck" in laag[:60]:
@@ -512,6 +524,14 @@ def parse_docx(pad: str):
             sleutel, waarde = mh.group(1).lower(), schoon(mh.group(2))
             if "bedrijfsnaam" in sleutel or "company name" in sleutel:
                 project["bedrijf"] = waarde
+            elif "application period" in sleutel:
+                # Sommige documenten hebben geen apart "Start date"-label en
+                # gebruiken alleen "Application period" (bv. "January until
+                # and including June 2026"). Vult zowel periode als, bij
+                # gebrek aan een echte startdatum, de startdatum-fallback.
+                project["periode"] = waarde
+                datum_match = RE_DATUM.search(waarde)
+                project["startdatum"] = datum_match.group(1) if datum_match else waarde
             elif "periode" in sleutel or "period" in sleutel:
                 project["periode"] = waarde
             elif "uren" in sleutel or "hours" in sleutel:
