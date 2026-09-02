@@ -232,6 +232,13 @@ def kop_type(tekst: str):
         if not (m and len(m.group(1).split()) > 6):
             return "techniek"
 
+    # Kop die begint met "Status" -> update-sectie, ongeacht wat erachter staat
+    # (bv. "Status en voortgang februari t/m december 2025", "Status S&O-project
+    # en voortgang, april - juni 2026"). De periode/datums erachter verschillen
+    # per aanvraag en per consultant, dus die worden hier bewust niet vastgelegd.
+    if re.match(r"^status\b", tekst, re.IGNORECASE):
+        return "update"
+
     beste = None
     beste_len = 0
     beste_sleutel = ""
@@ -751,6 +758,13 @@ def bouw_veldwaarden(p: dict, formuliertype: str = "programmatuur"):
     for veld in verplicht:
         if not velden.get(veld, "").strip():
             fouten.append(f"{VELD_LABELS[veld]}: leeg. Controleer of deze sectie in het Word-document staat.")
+
+    # Update project leeg -> AANDACHTSPUNT (geen fout: bij een nieuw project
+    # hoeft dit veld niet gevuld te zijn, maar bij een lopend project vaak wel).
+    if not velden.get("WbsoToelichtingWijzigingPlanning", "").strip():
+        aandacht.append("Update project is leeg. Bij een nieuw project kan dat kloppen; "
+                        "bij een lopend project controleren of de statusupdate in het "
+                        "Word-document is meegenomen.")
 
     if not velden["WbsoSOUrenBegroot"]:
         fouten.append("Geen uren gevonden.")
