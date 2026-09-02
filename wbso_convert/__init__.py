@@ -42,6 +42,19 @@ FORMULIER_PAD_FYSIEK = os.path.join(os.path.dirname(__file__), "leeg_formulier_f
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
+    """Buitenste laag: garandeert dat de Function ALTIJD een JSON-body met
+    status_code teruggeeft, ook bij een onverwachte/niet-voorziene fout.
+    Zonder dit vangnet zou zo'n fout een kale 500 zonder body opleveren,
+    waarna Parse JSON in de Power Automate-flow faalt en de flow stil
+    stopt zonder Teams-melding."""
+    try:
+        return _verwerk(req)
+    except Exception as e:
+        logging.exception("Onverwachte fout bij verwerking.")
+        return _fout(f"Onverwachte fout bij verwerking: {e}", 500)
+
+
+def _verwerk(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("WBSO-conversie aangeroepen.")
 
     try:
