@@ -173,6 +173,7 @@ KOP_MAP = [
     ("programming languages", "tools_sectie"),
     ("languages, development environment", "tools_sectie"),
     ("languages, development", "tools_sectie"),
+    ("technology stack", "tools_sectie"),
     # technische nieuwheid (TN) -> nieuwheid-sectie
     ("omschrijving technische nieuwheid", "nieuwheid_sectie"),
     ("technische nieuwheid programmatuur", "nieuwheid_sectie"),
