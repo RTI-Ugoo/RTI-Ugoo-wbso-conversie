@@ -103,7 +103,7 @@ def normaliseer_projectcode(code: str) -> str:
     # dubbele streepjes samenvouwen
     code = re.sub(r"-{2,}", "-", code)
     return code
-RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Aantal ontwikkeluren|WBSO-uren|WBSO uren|Aantal S&O-uren|S&O-uren|Number of R&D hours|Amount of R&D Hours|Number of hours|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Starting date|Start project|Startdatum project|Application period)\s*:\s*(.*)$", re.IGNORECASE)
+RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Application period|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Starting date|Start project|Startdatum project|[^\n:]{0,60}(?:uren|hours)[^\n:]{0,60})\s*:\s*(.*)$", re.IGNORECASE)
 RE_INTERNE_NOOT = re.compile(r"^<<.*>>$")
 
 # Tussenkopjes/labels die geen inhoudelijke tekst zijn en niet in een veld horen.
