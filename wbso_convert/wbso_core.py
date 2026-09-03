@@ -79,6 +79,11 @@ def is_bold(par) -> bool:
     return bool(runs) and all(r.bold for r in runs if r.text.strip())
 
 
+def is_underlined(par) -> bool:
+    runs = [r for r in par.runs if r.text.strip()]
+    return bool(runs) and all(r.underline for r in runs if r.text.strip())
+
+
 # ---------------------------------------------------------------- parsing
 # Projectregel: "Project <code>: <titel>". De code mag spaties/streepjes bevatten
 # (bv. "XX - 13", "XX-13", "XX 13"); die worden daarna genormaliseerd.
@@ -342,13 +347,15 @@ def classificeer_techniek(par) -> str:
     t = paragraaf_tekst(par).strip()
     laag = t.lower()
 
-    # Componentkop: begint met TK/TB<nummer> (evt. "TK2 en TO2:") en is vet.
-    if re.match(r"^(tk|tb)\s*\d*(\s+en\s+(to|ts)\s*\d*)?\s*[:.]", laag) and is_bold(par):
+    # Componentkop: begint met TK/TB<nummer> (evt. "TK2 en TO2:") en is vet of
+    # onderstreept.
+    if re.match(r"^(tk|tb)\s*\d*(\s+en\s+(to|ts)\s*\d*)?\s*[:.]", laag) and (is_bold(par) or is_underlined(par)):
         return "component"
     # Componentkop met alleen een cijfer, bv "3. (Integrations platform)" of
-    # "5. AI development platform", vet, binnen de techniek-sectie. Het cijfer
-    # dient als componentnummer voor de bijbehorende TB/TS/TR eronder.
-    if re.match(r"^\d+[.\)]\s+\S", t) and is_bold(par):
+    # "5. AI development platform", vet of onderstreept, binnen de
+    # techniek-sectie. Het cijfer dient als componentnummer voor de
+    # bijbehorende TB/TS/TR eronder.
+    if re.match(r"^\d+[.\)]\s+\S", t) and (is_bold(par) or is_underlined(par)):
         return "component"
     if laag.startswith(("onderstaand staat", "technische knelpunten en technische oplossingsricht",
                          "technical bottlenecks")):
@@ -381,11 +388,18 @@ def classificeer_techniek(par) -> str:
                 or re.search(r"^(\S+\s+){0,2}technical\s+(risk|novelty)", laag)):
             return "tr_kop"
 
-    # Ongenummerde component-kop: een korte VETTE naam die zelf geen TK/TO/TR-marker
+    # Ongenummerde component-kop: een korte naam die zelf geen TK/TO/TR-marker
     # is (bv. "Asynchrone endpoints", "Conditionele logging & tracing"). Dient als
     # component die automatisch doorgenummerd wordt. Alleen als kort en zonder
     # dubbele punt gevolgd door een zin (dat zou inline-tekst zijn).
-    if (is_bold(par) and len(t) < 70
+    # Geldt bij vet, onderstreept, OF een losse opsommingsregel (stijl "List
+    # Paragraph") — veel consultants gebruiken component-namen als kale
+    # bullet-regel zonder enige opmaak (bv. "Technology", "Read/write-routing
+    # for sync requests"). Zonder dit signaal blijft zo'n regel onopgemerkt
+    # als component-grens, waardoor de modus (tk/to/tr) niet terug naar "tk"
+    # springt en de knelpunttekst van dat component in het verkeerde veld
+    # belandt.
+    if ((is_bold(par) or is_underlined(par) or par.style.name == "List Paragraph") and len(t) < 70
             and not re.match(r"^(tk|tb|to|ts|tr|tn)\s*\d*\s*[:.]", laag)
             and not laag.startswith(("technisch", "technical", "programmeer", "programming",
                                      "tools", "knelpunt", "bottleneck", "oplossing", "solution",
