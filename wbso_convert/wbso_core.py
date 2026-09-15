@@ -92,6 +92,14 @@ RE_PROJECT = re.compile(r"^Project\s+(.+?)\s*:\s*(.+)$", re.IGNORECASE)
 # "Project title:" / "Projecttitel:" (titel) op aparte regels.
 RE_PROJECT_NUMMER = re.compile(r"^Project\s*(?:number|nummer)\s*:\s*(.+)$", re.IGNORECASE)
 RE_PROJECT_TITEL = re.compile(r"^Project\s*(?:title|titel)\s*:\s*(.+)$", re.IGNORECASE)
+# Vangnet: projectkop zonder dubbele punt, waarbij de tab(s) tussen code en
+# titel het scheidingsteken zijn (bv. "Project ANS-01\t\tTitel", een vergeten
+# dubbele punt t.o.v. het standaardformaat). Wordt gematcht op de RUWE tekst
+# (vóór schoon(), die tabs al naar spaties omzet) en vereist bovendien een
+# vetgedrukte eerste run — die combinatie komt in lopende tekst vrijwel nooit
+# voor, dus een toevallige vermelding van "Project X" midden in een zin wordt
+# hierdoor niet per ongeluk als nieuwe projectkop gezien.
+RE_PROJECT_TAB = re.compile(r"^Project\s+(\S[^\t]{0,24})\t+(.+)$", re.IGNORECASE)
 
 
 def normaliseer_projectcode(code: str) -> str:
@@ -512,6 +520,26 @@ def parse_docx(pad: str):
         if m_titel and project is not None and not project["titel"]:
             project["titel"] = schoon(m_titel.group(1))
             continue
+
+        # Vangnet: projectkop zonder dubbele punt, alleen tab(s) als scheiding
+        # (vergeten dubbele punt t.o.v. het standaardformaat). Gematcht op de
+        # RUWE tekst, want schoon() heeft de tabs in `tekst` al vervangen door
+        # spaties. Vereist ook een vetgedrukte eerste run, zodat een gewone
+        # zin die toevallig "Project X" bevat niet per ongeluk matcht (tabs
+        # midden in lopende tekst komen daarnaast al vrijwel nooit voor).
+        m_tab = RE_PROJECT_TAB.match(paragraaf_tekst(el))
+        if m_tab and eerste_run_bold:
+            code_kandidaat = m_tab.group(1).strip()
+            code_achtig = bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 \-\u2010-\u2015.]{0,24}", code_kandidaat))
+            if code_achtig:
+                if project:
+                    projecten.append(project)
+                project = nieuw_project(code_kandidaat, schoon(m_tab.group(2)))
+                sectie = None
+                huidige_component = None
+                auto_comp_teller = 0
+                techniek_modus = "tk"
+                continue
 
         m = RE_PROJECT.match(tekst)
         if m:
