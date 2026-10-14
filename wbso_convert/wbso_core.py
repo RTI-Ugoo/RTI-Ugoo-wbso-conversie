@@ -117,6 +117,14 @@ def normaliseer_projectcode(code: str) -> str:
     code = re.sub(r"-{2,}", "-", code)
     return code
 RE_HEADERVELD = re.compile(r"^(Statutaire bedrijfsnaam|Statutory company name|Periode|Period|Application period|Kosten/uitgaven|Costs/expenses|Startdatum|Start date|Starting date|Start project|Startdatum project|[^\n:]{0,60}(?:uren|hours)[^\n:]{0,60})\s*:\s*(.*)$", re.IGNORECASE)
+# Vangnet: startdatum-label zonder dubbele punt (vergeten scheidingsteken),
+# bv. "Starting date 01-01-2026" i.p.v. "Starting date: 01-01-2026". Alleen
+# voor de startdatum-labels zelf, niet voor de overige/generieke labels
+# hierboven (periode, uren/hours, kosten) — die zijn zonder dubbele punt veel
+# makkelijker te verwarren met gewone lopende tekst. "Startdatum project"
+# staat voor "Startdatum" in de alternatie, anders zou dat laatste als
+# voorvoegsel al matchen en "project" per ongeluk bij de datum trekken.
+RE_STARTDATUM_NOCOLON = re.compile(r"^(Startdatum project|Startdatum|Starting date|Start date|Start project)\s+(\S.+)$", re.IGNORECASE)
 RE_INTERNE_NOOT = re.compile(r"^<<.*>>$")
 
 # Tussenkopjes/labels die geen inhoudelijke tekst zijn en niet in een veld horen.
@@ -581,6 +589,15 @@ def parse_docx(pad: str):
             elif "start" in sleutel:
                 datum_match = RE_DATUM.search(waarde)
                 project["startdatum"] = datum_match.group(1) if datum_match else waarde
+            continue
+
+        # Zelfde vangnet, maar dan zonder dubbele punt (vergeten
+        # scheidingsteken bij een startdatum-label).
+        m_sd = RE_STARTDATUM_NOCOLON.match(tekst)
+        if m_sd and sectie is None:
+            waarde = schoon(m_sd.group(2))
+            datum_match = RE_DATUM.search(waarde)
+            project["startdatum"] = datum_match.group(1) if datum_match else waarde
             continue
 
         # Kop-detectie: een echte Heading-stijl, OF een korte vetgedrukte
