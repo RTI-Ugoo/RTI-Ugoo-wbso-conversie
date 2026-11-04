@@ -2,7 +2,7 @@
 Azure Function: WBSO Word-aanvraag -> gevulde RVO-projectformulieren.
 
 HTTP-trigger. Ontvangt een Word-document, vult per project het lege
-RVO-projectformulier (v1.8) en geeft de gevulde pdf's terug.
+RVO-projectformulier (v1.9) en geeft de gevulde pdf's terug.
 
 Request (JSON):
 {
