@@ -307,6 +307,9 @@ def kop_type(tekst: str):
     # per aanvraag en per consultant, dus die worden hier bewust niet vastgelegd.
     if re.match(r"^status\b", tekst, re.IGNORECASE):
         return "update"
+    # Omgekeerde variant: "Update status per september 2026", "Update voortgang".
+    if re.match(r"^update\s+(status|voortgang)\b", tekst, re.IGNORECASE):
+        return "update"
 
     # Kop die "planning", "fasering" of "timeline" bevat (ergens in de kop,
     # niet alleen aan het begin) -> faseringssectie. Vangt varianten als
@@ -666,7 +669,7 @@ def parse_docx(pad: str):
         # zininterne punt, om te voorkomen dat gewone lopende tekst die met
         # "Status" begint hier per ongeluk in trapt.
         is_statuskop = bool(
-            re.match(r"^status\b", tekst, re.IGNORECASE)
+            re.match(r"^(status\b|update\s+(status|voortgang)\b)", tekst, re.IGNORECASE)
             and len(tekst) < 100
             and not re.search(r"[.!?]\s+\S", tekst)
         )
