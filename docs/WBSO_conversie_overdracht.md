@@ -70,8 +70,8 @@ azure_function/
     ├── __init__.py           HTTP-entrypoint: leest request, kiest formulier, roept converteer() aan
     ├── function.json         httpTrigger, authLevel function, POST
     ├── wbso_core.py          ALLE parsing- en vul-logica (~1000 regels)
-    ├── leeg_formulier.pdf         RVO-formulier PROGRAMMATUUR (v1.8, 62 AcroForm-velden)
-    └── leeg_formulier_fysiek.pdf  RVO-formulier FYSIEK PRODUCT (v1.81)
+    ├── leeg_formulier.pdf         RVO-formulier PROGRAMMATUUR (v1.9, 62 AcroForm-velden)
+    └── leeg_formulier_fysiek.pdf  RVO-formulier FYSIEK PRODUCT (v1.9)
 ```
 
 **Deploy-workflow (VS Code):**
@@ -238,15 +238,31 @@ Verborgen/vaste velden programmatuur: WbsoProjecttype='B', WbsoProjectzwaartepun
 | (geen talen/tools-veld) | vervalt bij fysiek |
 
 WbsoProjectzwaartepunt fysiek: 'PDT' (Technisch nieuw product, default) of 'PPS' (Technisch nieuw
-productieproces). Script zet standaard PDT + aandachtspunt om te checken.
+productieproces). Script zet standaard PDT + aandachtspunt om te checken. LET OP: sinds v1.9 staat het
+veld in het lege formulier op "- maak een keuze -" (in v1.8x stond PDT voorgeselecteerd); het script
+zet PDT daarom expliciet.
 Het optionele programmatuur-blok binnen het fysiek-formulier wordt BEWUST GENEGEERD (komt in ~2%
 van de aanvragen voor; consultant vult dat handmatig bij).
 
 De parsing/validatie draait intern op de programmatuur-veldnamen (getest); bij fysiek worden de
 eindvelden vlak voor teruggave omgezet naar WbsoTWOVraag1/2/3 en vervalt het talen/tools-veld.
 
-### Tekenlimieten
-1500 tekens: omschrijving, update, TK, TO, tools, nieuwheid. 200: titel. 25: projectnummer.
+### Tekenlimieten (formulierversie 1.9, 20261020)
+| Veld | Programmatuur | Fysiek |
+|---|---|---|
+| Projectomschrijving, Update project | 2000 | 2000 |
+| 1. Knelpunten (TK) | 2000 | 2000 |
+| 2. Oplossingen (TO) | 2000 | 2000 |
+| 3. Talen/tools | 1500 | n.v.t. |
+| 4. Nieuwheid (programmatuur) / 3. Nieuwheid (fysiek) | 1500 | 2000 |
+| Kosten, Uitgaven | 500 | 500 |
+| Projecttitel / projectnummer | 200 / 25 | 200 / 25 |
+
+Limieten staan in `LIMIETEN` (+ `LIMIETEN_FYSIEK_AFWIJKING`) in `wbso_core.py`; `limieten_voor(type)`
+geeft de set per formuliertype. Bij een nieuwe formulierversie: de limieten staan in de JavaScript van
+de tekenindicatoren in de PDF (`2000 - nc`), niet in /MaxLen (dat is overal 4096).
+De "N tekens over."-tellervelden in de PDF worden bij het vullen bijgewerkt (`TELLER_VELDEN`),
+omdat het RVO-sjabloon verouderde tellerstanden bevat.
 
 ---
 
@@ -273,7 +289,7 @@ eindvelden vlak voor teruggave omgezet naar WbsoTWOVraag1/2/3 en vervalt het tal
   wordt uitgelezen via `paragraaf_tekst()` (python-docx' .text slaat sdt over).
 - **Faseringstabel:** laatste kolom = datum (ondersteunt 2- én 3-koloms tabellen). Datums worden NIET
   gevalideerd/gesignaleerd (te veel ruis).
-- **TK-overloop >1500 (alleen programmatuur):** overschot naar vraag 3 met marker
+- **TK-overloop >2000 (alleen programmatuur):** overschot naar vraag 3 met marker
   `[Vervolg TK's, zie vraag 3]` + prefix `Vervolg TK's: ` + witregel vóór talen/tools. Bij fysiek
   geen overloop (geen talen-veld) → tekenlimiet-fout.
 - **Uren-extractie (`extract_uren`):** pakt het eerste zinvolle getal, ook met tekst eromheen
@@ -347,7 +363,7 @@ inline-logica breekt gemakkelijk een ander geval. Dit is door de hele bouw het v
 - **Beheerapplicatie** (verkennend besproken, niets gebouwd): Power Apps-pagina voor overzicht +
   feedback ophalen. Feedback → Claude beoordeelt verbetervoorstellen → beheerder verwerkt. Deployen
   bij beheerder houden.
-- **Jaarlijkse check** op nieuwe RVO-formulierversies (nu programmatuur v1.8, fysiek v1.81) →
+- **Jaarlijkse check** op nieuwe RVO-formulierversies (nu programmatuur v1.9, fysiek v1.9, beide 20261020) →
   leeg_formulier(_fysiek).pdf vervangen.
 - **Brede testronde** met echte aanvragen na de gestapelde verbeteringen.
 

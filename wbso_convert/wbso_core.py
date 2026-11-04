@@ -29,17 +29,63 @@ def paragraaf_tekst(par) -> str:
     return "".join(delen)
 
 # ---------------------------------------------------------------- limieten
+# Tekenlimieten volgens RVO-projectformulieren v1.9 (20261020). Bron: de
+# JavaScript-tekenindicatoren in de formulier-PDF's zelf.
+#   programmatuur: omschrijving/update/TK/TO 2000, tools 1500, nieuwheid 1500
+#   fysiek:        omschrijving/update/TK/TO/nieuwheid 2000 (geen tools-veld)
+# Sleutels zijn de programmatuur-veldnamen (de parsing draait daarop; bij fysiek
+# worden de eindvelden pas bij teruggave omgezet naar WbsoTWOVraag1/2/3).
 LIMIETEN = {
     "Projectnummer": 25,
     "Projectnaam": 200,
-    "WbsoProjectomschrijving": 1500,
-    "WbsoToelichtingWijzigingPlanning": 1500,
-    "WbsoBeschrijvingTechnischProbleem": 1500,
-    "WbsoGekozenOplossingsrichting": 1500,
+    "WbsoProjectomschrijving": 2000,
+    "WbsoToelichtingWijzigingPlanning": 2000,
+    "WbsoBeschrijvingTechnischProbleem": 2000,
+    "WbsoGekozenOplossingsrichting": 2000,
     "WbsoBestaandeMethodenTechnieken": 1500,
     "WbsoZelfOntwikkelenMethoden": 1500,
     "WbsoKostenOmschrijving": 500,
     "WbsoUitgavenOmschrijving": 500,
+}
+# Afwijkingen voor het fysiek-product-formulier.
+LIMIETEN_FYSIEK_AFWIJKING = {
+    "WbsoZelfOntwikkelenMethoden": 2000,  # WbsoTWOVraag3 (technische nieuwheid)
+}
+
+
+def limieten_voor(formuliertype: str = "programmatuur") -> dict:
+    """Tekenlimieten voor het opgegeven formuliertype."""
+    limieten = dict(LIMIETEN)
+    if formuliertype == "fysiek":
+        limieten.update(LIMIETEN_FYSIEK_AFWIJKING)
+    return limieten
+
+
+# Tekenindicator ("N tekens over.") per formulier: programmatuur-veldnaam
+# -> naam van het teller-veld in de PDF. De sjablonen bevatten achtergebleven
+# tellerstanden van de RVO; die worden bij het vullen bijgewerkt.
+TELLER_VELDEN = {
+    "programmatuur": {
+        "WbsoProjectomschrijving": "tellerProjectomschrijving",
+        "WbsoToelichtingWijzigingPlanning": "tellerWijzigingPlanning",
+        "WbsoBeschrijvingTechnischProbleem": "tellerBeschrijvingTechnischProbleem",
+        "WbsoGekozenOplossingsrichting": "tellerGekozenOplossingsrichting",
+        "WbsoBestaandeMethodenTechnieken": "tellerBestaandeMethodenEnTechnieken",
+        "WbsoZelfOntwikkelenMethoden": "tellerBestaandeMethoden",
+    },
+    "fysiek": {
+        "WbsoProjectomschrijving": "tellerProjectomschrijving",
+        "WbsoToelichtingWijzigingPlanning": "tellerWijzigingPlanning",
+        "WbsoTWOVraag1": "tellerKnelpuntenFysiek",
+        "WbsoTWOVraag2": "tellerOplossingenFysiek",
+        "WbsoTWOVraag3": "tellerNieuwheidFysiek",
+    },
+}
+# Fysiek-veld -> programmatuur-sleutel waarop de limiet is vastgelegd.
+_FYSIEK_NAAR_LIMIETSLEUTEL = {
+    "WbsoTWOVraag1": "WbsoBeschrijvingTechnischProbleem",
+    "WbsoTWOVraag2": "WbsoGekozenOplossingsrichting",
+    "WbsoTWOVraag3": "WbsoZelfOntwikkelenMethoden",
 }
 
 VELD_LABELS = {
@@ -814,6 +860,7 @@ def bouw_veldwaarden(p: dict, formuliertype: str = "programmatuur"):
     formuliertype: 'programmatuur' (standaard) of 'fysiek' (fysiek product/productieproces)."""
     fouten = p["fouten"]
     aandacht = p["aandachtspunten"]
+    limieten = limieten_voor(formuliertype)
 
     nieuwheid_delen = []
     if p["tr"]:
@@ -863,7 +910,7 @@ def bouw_veldwaarden(p: dict, formuliertype: str = "programmatuur"):
         verwerk_tk_overloop(velden, fouten, aandacht)
 
     # Tekenlimieten -> FOUT (portaal weigert/kapt af)
-    for veld, limiet in LIMIETEN.items():
+    for veld, limiet in limieten.items():
         waarde = velden.get(veld, "")
         if len(waarde) > limiet:
             fouten.append(f"{VELD_LABELS.get(veld, veld)}: {len(waarde)} tekens, limiet is {limiet} ({len(waarde) - limiet} te veel). Inkorten vereist.")
@@ -927,6 +974,15 @@ def bouw_veldwaarden(p: dict, formuliertype: str = "programmatuur"):
         velden["WbsoTWOVraag2"] = velden.pop("WbsoGekozenOplossingsrichting", "")
         velden["WbsoTWOVraag3"] = velden.pop("WbsoZelfOntwikkelenMethoden", "")
         velden.pop("WbsoBestaandeMethodenTechnieken", None)  # geen talen/tools-veld
+        # Sinds v1.9 staat het zwaartepunt in het lege fysiek-formulier op
+        # "- maak een keuze -" (voorheen vooringesteld op PDT). Zonder expliciete
+        # waarde zou het veld dus leeg blijven; zet daarom standaard PDT.
+        velden["WbsoProjectzwaartepunt"] = "PDT"
+
+    # Tekenindicatoren ("N tekens over.") bijwerken op basis van de eindwaarden.
+    for veld, teller in TELLER_VELDEN[formuliertype if formuliertype == "fysiek" else "programmatuur"].items():
+        limiet = limieten[_FYSIEK_NAAR_LIMIETSLEUTEL.get(veld, veld)]
+        velden[teller] = f"{limiet - len(velden.get(veld, ''))} tekens over."
 
     return velden
 
@@ -976,7 +1032,7 @@ def verwerk_tk_overloop(velden: dict, fouten: list, aandacht: list):
     aandacht.append(f"TK-veld was {len(tk)} tekens (limiet {limiet}). Laatste {len(rest)} tekens "
                     f"doorgeschoven naar vraag 3. Controleer of de afkapping logisch is.")
     if len(velden["WbsoBestaandeMethodenTechnieken"]) > LIMIETEN["WbsoBestaandeMethodenTechnieken"]:
-        fouten.append("Vraag 3 zit na het TK-vervolg zelf boven de 1500 tekens. Handmatig inkorten vereist.")
+        fouten.append(f"Vraag 3 zit na het TK-vervolg zelf boven de {LIMIETEN['WbsoBestaandeMethodenTechnieken']} tekens. Handmatig inkorten vereist.")
 
 
 # ---------------------------------------------------------------- pdf vullen
@@ -1000,7 +1056,8 @@ def vul_pdf(bron: str, velden: dict, doel: Path):
 
 
 # ---------------------------------------------------------------- rapport
-def maak_rapport(projecten_uit: list, doel: Path):
+def maak_rapport(projecten_uit: list, doel: Path, formuliertype: str = "programmatuur"):
+    limieten = limieten_voor(formuliertype)
     regels = ["# Controlerapport WBSO-formulieren", ""]
     regels.append(f"Gegenereerd: {datetime.now().strftime('%d-%m-%Y %H:%M')}. "
                   "Controleer elk formulier volledig voordat het wordt geüpload in het RVO-portaal.")
@@ -1011,7 +1068,7 @@ def maak_rapport(projecten_uit: list, doel: Path):
         regels.append("")
         regels.append("| Veld | Tekens | Limiet | Status |")
         regels.append("|---|---|---|---|")
-        for veld, limiet in LIMIETEN.items():
+        for veld, limiet in limieten.items():
             if veld in ("Projectnummer", "Projectnaam"):
                 continue
             lengte = len(velden.get(veld, ""))
